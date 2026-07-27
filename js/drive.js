@@ -259,7 +259,8 @@ export async function sync(mode = 'sync', onProgress = () => {}) {
     onProgress(`사진 내려받는 중… ${++pulled}/${toPull.length}`);
     try {
       const blob = await download(files.get('p_' + pid + '.jpg').id);
-      await DB.savePhotoFile(blob, pid);
+      // 받은 것을 원본으로 두고 표시용·썸네일을 다시 만든다
+      await DB.savePhotoFile(blob, pid, S.get('keepOriginal'));
       havePhotos.add(pid);
     } catch (e) { console.warn('사진 복원 실패', pid, e); }
   }
@@ -270,9 +271,10 @@ export async function sync(mode = 'sync', onProgress = () => {}) {
     const toPush = [...needed].filter(p => havePhotos.has(p) && !files.has('p_' + p + '.jpg'));
     for (const pid of toPush) {
       onProgress(`사진 올리는 중… ${++pushed}/${toPush.length}`);
-      const p = await DB.getPhoto(pid);
-      if (!p?.blob) continue;
-      await uploadNew(folderId, 'p_' + pid + '.jpg', p.blob, 'image/jpeg');
+      // 원본이 있으면 원본을 올린다. 다른 기기에서도 원본 화질로 받아볼 수 있게.
+      const best = await DB.bestBlob(pid);
+      if (!best?.blob) continue;
+      await uploadNew(folderId, 'p_' + pid + '.jpg', best.blob, best.type || 'image/jpeg');
     }
     // 4) entries.json 올리기
     onProgress('일기 데이터 올리는 중…');

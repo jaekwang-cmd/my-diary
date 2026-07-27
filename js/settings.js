@@ -52,6 +52,7 @@ const DEFAULTS = {
   autoSync: false,
   clientId: '',
   driveEmail: '',
+  keepOriginal: true,      // 사진 원본을 그대로 보관할지 (원본 화질 다운로드용)
 
   // ── 루틴 / D-DAY / 통계 ──
   routines: SEED_ROUTINES,          // [{id,name,emoji,color,tag}]

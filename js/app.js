@@ -358,7 +358,7 @@ function bindEditor() {
       let n = 0;
       for (const f of files) {
         if (!f.type.startsWith('image/')) continue;
-        const id = await DB.savePhotoFile(f);
+        const id = await DB.savePhotoFile(f, null, S.get('keepOriginal'));
         if (editing !== target) { await DB.delPhoto(id); return; }
         target.photos.push(id);
         if (files.length > 1) spinText(`사진 처리 중… ${++n}/${files.length}`);
@@ -524,7 +524,180 @@ function bindViewer() {
       },
     });
   };
-  $('#lightbox').onclick = () => closeTop();
+  bindLightbox();
+}
+
+/* ---------- 사진 확대 뷰어 ---------- */
+let lbId = null;
+let lbScale = 1, lbTx = 0, lbTy = 0;
+
+function lbApply(animate) {
+  const im = $('#lbImg');
+  im.style.transition = animate ? 'transform .18s ease' : 'none';
+  im.style.transform = `translate(${lbTx}px, ${lbTy}px) scale(${lbScale})`;
+}
+function lbReset(animate) { lbScale = 1; lbTx = 0; lbTy = 0; lbApply(animate); }
+
+/* 사진은 flex 로 가운데 놓여 있고 transform-origin 은 좌상단이다.
+   그래서 화면 좌표 ↔ 사진 좌표를 옮길 때 가운데 정렬로 생긴 여백(base)을 빼줘야 한다. */
+function lbGeom() {
+  const im = $('#lbImg');
+  const st = $('#lbStage').getBoundingClientRect();
+  return {
+    iw: im.clientWidth, ih: im.clientHeight,
+    W: st.width, H: st.height,
+    baseL: (st.width - im.clientWidth) / 2,
+    baseT: (st.height - im.clientHeight) / 2,
+  };
+}
+
+/** 확대 배율을 바꾸되 화면상 (px,py) 지점이 제자리에 머물게 한다 */
+function lbZoomAt(newScale, px, py) {
+  const s = Math.min(6, Math.max(1, newScale));
+  const g = lbGeom();
+  const k = s / lbScale;
+  // 사진 좌상단의 화면상 위치를 기준으로 계산
+  lbTx = (px - g.baseL) - (px - g.baseL - lbTx) * k;
+  lbTy = (py - g.baseT) - (py - g.baseT - lbTy) * k;
+  lbScale = s;
+  lbClamp();
+}
+
+/** 확대한 사진이 화면 밖으로 빠져나가지 않게 잡아준다 */
+function lbClamp() {
+  const g = lbGeom();
+  if (!g.iw || !g.ih) return;
+  const sw = g.iw * lbScale, sh = g.ih * lbScale;
+  // 화면보다 작으면 가운데로, 크면 화면을 덮는 범위 안에서만 이동 허용
+  lbTx = sw <= g.W ? (g.W - sw) / 2 - g.baseL
+    : Math.min(-g.baseL, Math.max(g.W - g.baseL - sw, lbTx));
+  lbTy = sh <= g.H ? (g.H - sh) / 2 - g.baseT
+    : Math.min(-g.baseT, Math.max(g.H - g.baseT - sh, lbTy));
+}
+
+async function openLightbox(pid, fallbackURL) {
+  lbId = pid;
+  const im = $('#lbImg');
+  im.src = fallbackURL || '';
+  lbReset(false);
+  $('#lightbox').classList.remove('hidden');
+  pushPage(() => { $('#lightbox').classList.add('hidden'); lbId = null; });
+
+  // 확대해도 뭉개지지 않도록 원본이 있으면 원본으로 교체
+  const best = await DB.bestBlob(pid);
+  if (lbId !== pid) return;
+  const orig = await DB.photoURL(pid, 'orig');
+  if (lbId === pid && orig) im.src = orig;
+  $('#lbInfo').innerHTML = best
+    ? `<b>${best.isOriginal ? '원본' : '저장본'}</b>${bytes(best.size)}`
+    : '';
+  $('#lbShare').hidden = !(navigator.share && navigator.canShare);
+}
+
+function bindLightbox() {
+  const lb = $('#lightbox'), stage = $('#lbStage'), im = $('#lbImg');
+
+  $('#lbClose').onclick = (e) => { e.stopPropagation(); closeTop(); };
+  $('#lbDown').onclick = (e) => { e.stopPropagation(); downloadPhoto(lbId); };
+  $('#lbShare').onclick = (e) => { e.stopPropagation(); sharePhoto(lbId); };
+
+  const pts = new Map();
+  let startDist = 0, startScale = 1, startMid = null;
+  let panFrom = null;
+  let lastTap = 0, movedFar = false;
+
+  stage.addEventListener('pointerdown', (ev) => {
+    // 포인터 캡처가 실패해도 확대/이동 로직은 계속 동작해야 한다
+    try { stage.setPointerCapture(ev.pointerId); } catch { /* 무시 */ }
+    pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    movedFar = false;
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      startDist = Math.hypot(a.x - b.x, a.y - b.y);
+      startScale = lbScale;
+      startMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    } else if (pts.size === 1 && lbScale > 1) {
+      panFrom = { x: ev.clientX - lbTx, y: ev.clientY - lbTy };
+    }
+  });
+
+  stage.addEventListener('pointermove', (ev) => {
+    if (!pts.has(ev.pointerId)) return;
+    const prev = pts.get(ev.pointerId);
+    if (Math.hypot(ev.clientX - prev.x, ev.clientY - prev.y) > 6) movedFar = true;
+    pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+    if (pts.size === 2 && startDist) {
+      const [a, b] = [...pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      lbZoomAt(startScale * (d / startDist), startMid.x, startMid.y);
+      lbApply(false);
+    } else if (pts.size === 1 && panFrom && lbScale > 1) {
+      lbTx = ev.clientX - panFrom.x;
+      lbTy = ev.clientY - panFrom.y;
+      lbClamp();
+      lbApply(false);
+    }
+  });
+
+  const up = (ev) => {
+    pts.delete(ev.pointerId);
+    if (pts.size < 2) { startDist = 0; startMid = null; }
+    if (pts.size === 0) {
+      panFrom = null;
+      if (!movedFar) {
+        const now = Date.now();
+        if (now - lastTap < 300) {           // 더블탭 → 확대/원래대로
+          lastTap = 0;
+          if (lbScale > 1.05) lbReset(true);
+          else { lbZoomAt(2.6, ev.clientX, ev.clientY); lbApply(true); }
+        } else {
+          lastTap = now;
+          setTimeout(() => {                  // 싱글탭 → 확대 안 된 상태면 닫기
+            if (lastTap && Date.now() - lastTap >= 290 && lbScale <= 1.05 && lbId) closeTop();
+          }, 300);
+        }
+      }
+    }
+  };
+  stage.addEventListener('pointerup', up);
+  stage.addEventListener('pointercancel', up);
+
+  // PC 에서는 휠로 확대
+  lb.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    lbZoomAt(lbScale * (ev.deltaY < 0 ? 1.15 : 1 / 1.15), ev.clientX, ev.clientY);
+    lbApply(false);
+  }, { passive: false });
+
+  im.addEventListener('dragstart', e => e.preventDefault());
+}
+
+function photoFileName(best, ext) {
+  if (best?.name) return best.name;
+  const d = new Date();
+  return `일기사진_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`;
+}
+
+async function downloadPhoto(pid) {
+  if (!pid) return;
+  const best = await DB.bestBlob(pid);
+  if (!best) { toast('사진을 찾을 수 없습니다.'); return; }
+  const ext = (best.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+  saveBlob(best.blob, photoFileName(best, ext));
+  toast(best.isOriginal ? '원본 화질로 저장했습니다.' : '저장했습니다.');
+}
+
+async function sharePhoto(pid) {
+  if (!pid) return;
+  const best = await DB.bestBlob(pid);
+  if (!best) return;
+  const ext = (best.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+  const file = new File([best.blob], photoFileName(best, ext), { type: best.type });
+  try {
+    if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file] });
+    else toast('이 기기에서는 공유를 지원하지 않습니다.');
+  } catch (e) { if (e.name !== 'AbortError') toast('공유하지 못했습니다.'); }
 }
 
 async function openViewer(id) {
@@ -551,11 +724,7 @@ async function openViewer(id) {
     const img = document.createElement('img');
     const u = await DB.photoURL(pid, 'full');
     if (u) img.src = u;
-    img.onclick = () => {
-      $('#lbImg').src = u;
-      $('#lightbox').classList.remove('hidden');
-      pushPage(() => $('#lightbox').classList.add('hidden'));
-    };
+    img.onclick = () => openLightbox(pid, u);
     ph.appendChild(img);
   }
 }
@@ -748,6 +917,26 @@ function bindSettings() {
     if (ev.target.checked) runSync('sync');
   };
 
+  $('#swKeepOrig').onchange = (ev) => {
+    if (ev.target.checked) { S.set('keepOriginal', true); refreshSettings(); toast('앞으로 넣는 사진은 원본도 함께 보관합니다.'); return; }
+    ev.target.checked = true;      // 확인 전까지는 켠 상태 유지
+    confirmSheet({
+      title: '원본 화질 보관을 끌까요?',
+      desc: '이미 저장된 원본도 함께 지워집니다. 지우면 되돌릴 수 없고, 앞으로는 줄어든 화질로만 남습니다.',
+      okText: '끄고 원본 삭제',
+      danger: true,
+      onOk: async () => {
+        closeTop();
+        spin('원본 정리 중…');
+        const freed = await DB.dropAllOriginals();
+        S.set('keepOriginal', false);
+        spinOff();
+        refreshSettings();
+        toast(`원본을 지워 ${bytes(freed)} 확보했습니다.`);
+      },
+    });
+  };
+
   $('#rowExport').onclick = doExport;
   $('#rowImport').onclick = doImport;
   $('#rowWipe').onclick = () => confirmSheet({
@@ -768,7 +957,7 @@ function bindSettings() {
     <p class="desc">
       설치형 웹앱(PWA)입니다. 홈 화면에 추가하면 앱처럼 실행됩니다.<br>
       일기는 이 기기 안에 저장되며, 구글 드라이브에 백업하면 다른 기기에서도 볼 수 있습니다.<br><br>
-      version 1.1.0
+      version 1.3.0
     </p>
     <div class="sheet-actions"><button class="btn-main" data-x="ok">닫기</button></div>`)
     .querySelector('[data-x="ok"]').onclick = () => closeTop();
@@ -799,9 +988,13 @@ async function refreshSettings() {
     ? '드라이브의 <b>' + esc('심플일기장 백업') + '</b> 폴더에 저장됩니다. 다른 기기에서 같은 계정으로 연결하면 일기가 합쳐집니다.'
     : '연동하려면 구글 OAuth 클라이언트 ID가 필요합니다. 함께 만든 <b>SETUP.md</b> 파일의 순서를 따라 발급받으세요.';
 
+  $('#swKeepOrig').checked = S.get('keepOriginal');
   $('#vLastSync').textContent = relTime(await DB.getMeta('lastSync', 0));
   $('#vCount').textContent = (await DB.countEntries()) + '건';
-  $('#vStorage').textContent = bytes(await DB.photoBytes());
+  const ph = await DB.photoBytes();
+  $('#vStorage').textContent = ph.orig
+    ? `${bytes(ph.total)} (원본 ${bytes(ph.orig)})`
+    : bytes(ph.total);
 
   const persisted = await requestPersistentStorage();
   $('#vPersist').textContent =
@@ -933,8 +1126,8 @@ async function doExport() {
     let i = 0;
     for (const pid of usedPhotos) {
       spinText(`사진 담는 중… ${++i}/${usedPhotos.size}`);
-      const p = await DB.getPhoto(pid);
-      if (p?.blob) files.push({ name: `사진/p_${pid}.jpg`, data: p.blob });
+      const best = await DB.bestBlob(pid);          // 원본이 있으면 원본으로
+      if (best?.blob) files.push({ name: `사진/p_${pid}.jpg`, data: best.blob });
     }
 
     files.push({
@@ -996,7 +1189,7 @@ function doImport() {
       for (const p of photos) {
         if (have.has(p.id)) continue;
         spinText(`사진 복원 중… ${++n}/${photos.length}`);
-        await DB.savePhotoFile(p.blob, p.id);
+        await DB.savePhotoFile(p.blob, p.id, S.get('keepOriginal'));
       }
 
       spinText('일기 합치는 중…');
