@@ -39,7 +39,7 @@ python -m http.server 5173 --directory C:\Users\mj497\my-diary
 cd C:\Users\mj497\my-diary
 git init
 git add .
-git commit -m "심플 일기장 PWA"
+git commit -m "추억 일기 PWA"
 git branch -M main
 git remote add origin https://github.com/본인아이디/my-diary.git
 git push -u origin main
@@ -112,7 +112,7 @@ https://본인아이디.github.io/my-diary/
 왼쪽 메뉴에서 **Google Auth 플랫폼**(예전 이름: OAuth 동의 화면)으로 들어갑니다.
 
 1. **시작하기** 를 누르고 순서대로 입력
-   - **앱 이름**: `심플 일기장`
+   - **앱 이름**: `추억 일기`
    - **사용자 지원 이메일**: 본인 이메일 선택
    - **대상**(Audience): **외부** 선택
    - **연락처 정보**: 본인 이메일 입력
@@ -177,7 +177,7 @@ git push
 ### 2-7. 확인
 
 설정 → **지금 백업하기** 를 누르면 구글 드라이브에
-**`심플일기장 백업`** 폴더가 생기고 그 안에 데이터가 저장됩니다.
+**`추억일기 백업`** 폴더가 생기고 그 안에 데이터가 저장됩니다.
 
 다른 기기(아이폰 등)에서 같은 주소로 접속 → 같은 구글 계정 연결 →
 **드라이브에서 복원** 하면 일기가 넘어옵니다.

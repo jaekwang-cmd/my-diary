@@ -8,4 +8,4 @@
 export const DEFAULT_CLIENT_ID = '';
 
 // 드라이브에 만들어질 백업 폴더 이름
-export const FOLDER_NAME = '심플일기장 백업';
+export const FOLDER_NAME = '추억일기 백업';

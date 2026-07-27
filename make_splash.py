@@ -34,7 +34,7 @@ def build(cw, ch, dpr, dark):
     ix, iy = (W - side) // 2, int(H * 0.5) - side - int(H * 0.02)
     img.paste(icon, (ix, iy), icon)
 
-    label = "일기장"
+    label = "추억 일기"
     try:
         font = ImageFont.truetype(FONT_PATH, int(W * 0.045))
         d = ImageDraw.Draw(img)

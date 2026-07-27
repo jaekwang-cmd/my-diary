@@ -1,5 +1,5 @@
 /* 오프라인 캐시 서비스 워커 */
-const CACHE = 'diary-v1.3.0';
+const CACHE = 'diary-v1.4.0';
 const ASSETS = [
   './',
   './index.html',

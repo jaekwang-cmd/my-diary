@@ -965,7 +965,7 @@ function bindSettings() {
     },
   });
   $('#rowAbout').onclick = () => openSheetHTML(`
-    <h3>심플 일기장</h3>
+    <h3>추억 일기</h3>
     <p class="desc">
       설치형 웹앱(PWA)입니다. 홈 화면에 추가하면 앱처럼 실행됩니다.<br>
       일기는 이 기기 안에 저장되며, 구글 드라이브에 백업하면 다른 기기에서도 볼 수 있습니다.<br><br>
@@ -999,7 +999,7 @@ async function refreshSettings() {
     : '구글 클라이언트 ID 입력하기';
   $('#rowDriveOut').hidden = !linked;
   $('#driveNote').innerHTML = configured
-    ? '드라이브의 <b>' + esc('심플일기장 백업') + '</b> 폴더에 저장됩니다. 다른 기기에서 같은 계정으로 연결하면 일기가 합쳐집니다.'
+    ? '드라이브의 <b>' + esc('추억일기 백업') + '</b> 폴더에 저장됩니다. 다른 기기에서 같은 계정으로 연결하면 일기가 합쳐집니다.'
     : '연동하려면 구글 OAuth 클라이언트 ID가 필요합니다. 함께 만든 <b>SETUP.md</b> 파일의 순서를 따라 발급받으세요.';
 
   $('#swKeepOrig').checked = S.get('keepOriginal');
@@ -1166,7 +1166,7 @@ async function doExport() {
     spinText('압축 중…');
     const zip = await ZipKit.makeZip(files);
     const d = new Date();
-    saveBlob(zip, `일기장백업_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.zip`);
+    saveBlob(zip, `추억일기_백업_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.zip`);
     spinOff();
     toast('내보내기 완료');
   } catch (e) {
@@ -1752,8 +1752,8 @@ async function registerBiometric() {
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge: crypto.getRandomValues(new Uint8Array(32)),
-        rp: { name: '심플 일기장', id: location.hostname },
-        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'diary', displayName: '일기장' },
+        rp: { name: '추억 일기', id: location.hostname },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'diary', displayName: '추억 일기' },
         pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
         authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
         timeout: 60000,
