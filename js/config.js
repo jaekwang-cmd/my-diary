@@ -5,7 +5,7 @@
 // │  (앱 → 설정 → 구글 드라이브 화면에서 직접 입력해도 됩니다)   │
 // │  발급 방법은 SETUP.md 파일 참고                              │
 // └─────────────────────────────────────────────────────────────┘
-export const DEFAULT_CLIENT_ID = '';
+export const DEFAULT_CLIENT_ID = '102131806877-h13bq5hmknk4d80dfq7eiceqs84iqep4.apps.googleusercontent.com';
 
 // 드라이브에 만들어질 백업 폴더 이름
 export const FOLDER_NAME = '추억일기 백업';
