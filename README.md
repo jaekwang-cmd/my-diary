@@ -62,11 +62,30 @@ js/db.js                 IndexedDB 저장소 · 이미지 처리
 js/settings.js           설정값 · 테마 19종 · 패스코드 해시
 js/drive.js              구글 드라이브 동기화
 js/config.js             구글 클라이언트 ID  ← 여기만 수정하면 됨
+js/demo.js               미리보기용 샘플 데이터 (?demo 로 접속할 때만)
 js/vendor/zip.js         zip 읽기/쓰기
 sw.js                    오프라인 캐시
 manifest.webmanifest     앱 정보
 icons/                   앱 아이콘
+icons/splash/            아이폰 시작화면 (기종별 24장)
 ```
+
+## 주소 뒤에 붙일 수 있는 옵션
+
+| 주소 | 하는 일 |
+|---|---|
+| `?demo` | 샘플 일기 18건과 D-DAY 3개를 채워 넣습니다 (일기가 하나도 없을 때만) |
+| `?iosbanner` | 아이폰 설치 안내 배너를 PC에서도 띄워 봅니다 |
+
+## 아이폰 대응
+
+- 기종별 시작화면 24장 (라이트/다크 각각) — 안드로이드는 manifest로 자동 생성돼 불필요
+- 입력창 글자를 최소 16px로 고정 — 아이폰이 탭할 때 화면을 확대하는 것 방지
+- `navigator.storage.persist()` 로 저장 데이터 정리 방지 요청
+- 알림은 서비스워커 방식 우선 (아이폰은 `new Notification()` 미지원)
+- Safari로 열었는데 설치 안 했으면 안내 배너 표시
+
+시작화면을 다시 만들려면 `make_splash.py` 를 실행하면 됩니다.
 
 ## 여러 기기에서 쓸 때
 

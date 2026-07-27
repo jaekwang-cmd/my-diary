@@ -88,8 +88,10 @@ export function applyTheme() {
   const t = THEMES.find(x => x.id === S.theme) || THEMES[0];
   const root = document.documentElement;
   root.style.setProperty('--accent', t.c);
-  root.style.setProperty('--fs', FONT_SIZES[S.font] || FONT_SIZES.md);
   root.style.setProperty('--lines', String(S.lines));
+  // 화면 크기는 전부 rem 으로 잡혀 있으므로 html 의 font-size 를 바꿔야 실제로 반영된다.
+  // (body 에 걸면 rem 기준이 그대로라 글자 크기 설정이 먹지 않는다)
+  root.style.fontSize = FONT_SIZES[S.font] || FONT_SIZES.md;
   root.dataset.dark = isDark() ? '1' : '0';
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', isDark() ? '#15181c' : t.c);

@@ -12,7 +12,6 @@
   --danger:#e5484d;
   --topbar:#ffffff;
   --shadow:0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.05);
-  --fs:16px;
   --r:14px;
   --safe-b:env(safe-area-inset-bottom, 0px);
   --safe-t:env(safe-area-inset-top, 0px);
@@ -33,10 +32,19 @@ html,body{height:100%}
 body{
   margin:0;background:var(--bg);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic","Segoe UI",Roboto,sans-serif;
-  font-size:var(--fs);line-height:1.5;
+  font-size:1rem;line-height:1.5;
   overscroll-behavior-y:none;
   -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;          /* 아이폰이 임의로 글자를 키우지 않게 */
 }
+/* 아이폰은 입력창 글자가 16px 미만이면 탭할 때 화면을 확대해버린다 */
+input,textarea,select{font-size:max(16px,1rem)}
+/* 버튼을 길게 눌렀을 때 뜨는 iOS 확대경·선택 메뉴 끄기 (본문은 선택 가능하게 남겨둠) */
+button,.tab,.chip,.entry,.row,.opt,.mrow,.keypad,.cal-cell,.dcard{
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+}
+.vw-body,.vw-title,.e-body,.e-title{-webkit-user-select:text;user-select:text}
+.scroll{overscroll-behavior:contain}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 input,textarea{font:inherit;color:inherit}
 svg{fill:currentColor;display:block}
@@ -166,9 +174,9 @@ html[data-dark="1"] .sw i{background:#3a4047}
 .dt-btn{flex:1;text-align:center;font-weight:700;font-size:.94rem;padding:8px;border-radius:10px;letter-spacing:-.3px}
 .dt-btn:not(.plain):active{background:var(--line2)}
 .edit-scroll{padding:14px 16px calc(120px + var(--safe-b));background:var(--card)}
-.ed-title{width:100%;border:0;outline:0;background:none;font-size:1.14rem;font-weight:700;padding:4px 0 10px}
+.ed-title{width:100%;border:0;outline:0;background:none;font-size:max(16px,1.14rem);font-weight:700;padding:4px 0 10px}
 .ed-title::placeholder,.ed-body::placeholder{color:var(--ink3);font-weight:400}
-.ed-body{width:100%;border:0;outline:0;background:none;resize:none;min-height:44vh;font-size:1rem;line-height:1.75;padding:0}
+.ed-body{width:100%;border:0;outline:0;background:none;resize:none;min-height:44vh;font-size:max(16px,1rem);line-height:1.75;padding:0}
 .photo-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
 .ph{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--line2)}
 .ph img{width:100%;height:100%;object-fit:cover}
@@ -184,7 +192,7 @@ html[data-dark="1"] .sw i{background:#3a4047}
 
 /* ===== 검색 ===== */
 .searchfield{flex:1;display:flex;align-items:center;background:var(--line2);border-radius:11px;padding:0 8px 0 12px;height:38px}
-.searchfield input{flex:1;border:0;outline:0;background:none;font-size:.95rem}
+.searchfield input{flex:1;border:0;outline:0;background:none;font-size:max(16px,.95rem)}
 .clr{width:26px;height:26px;border-radius:50%;color:var(--ink3);font-size:.8rem}
 .tagbar{display:flex;gap:6px;padding:11px 14px;overflow-x:auto;white-space:nowrap}
 .tagbar .tag{padding:5px 11px;font-size:.82rem;flex:none}
@@ -207,6 +215,27 @@ html[data-dark="1"] .sw i{background:#3a4047}
 .keypad button.ghost{background:none;box-shadow:none;color:var(--ink2)}
 .keypad b{font-size:1.42rem;font-weight:600}
 .keypad s{font-size:.55rem;letter-spacing:1.2px;color:var(--ink3);text-decoration:none;margin-top:2px}
+
+/* ===== 아이폰 설치 안내 배너 ===== */
+.ios-banner{
+  position:fixed;left:10px;right:10px;bottom:calc(66px + var(--safe-b));z-index:22;
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:15px;
+  background:var(--card);box-shadow:0 6px 22px rgba(16,24,40,.18);
+  border:1px solid var(--line);
+}
+html[data-dark="1"] .ios-banner{box-shadow:0 6px 22px rgba(0,0,0,.5)}
+.ios-banner img{width:36px;height:36px;border-radius:9px;flex:none}
+.ib-txt{flex:1;min-width:0;line-height:1.3}
+.ib-txt b{display:block;font-size:.85rem}
+.ib-txt span{display:block;font-size:.72rem;color:var(--ink2);margin-top:2px}
+.ib-go{flex:none;padding:8px 13px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-size:.8rem;font-weight:700}
+.ib-x{flex:none;width:26px;height:26px;border-radius:50%;color:var(--ink3);font-size:.78rem}
+/* 배너가 떠 있는 동안에는 글쓰기 버튼을 위로 올려 겹치지 않게 한다 */
+body.ios-banner-on .fab{bottom:calc(152px + var(--safe-b))}
+.share-steps{padding:2px 20px 12px;margin:0;color:var(--ink);font-size:.9rem;line-height:2}
+.share-steps li{margin-bottom:2px}
+.share-steps b{color:var(--accent)}
 
 /* ===== 루틴 칩 ===== */
 .chiprow{display:flex;gap:7px;overflow-x:auto;padding:4px 0 12px;margin-bottom:2px;scrollbar-width:none}

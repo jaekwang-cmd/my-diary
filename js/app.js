@@ -138,6 +138,7 @@ async function init() {
   scheduleNotify();
   registerSW();
   requestPersistentStorage();
+  showIOSBannerIfNeeded();
 
   // 자동 백업: 앱 시작 시 1회 조용히
   if (S.get('autoSync') && Drive.isConfigured()) {
@@ -1578,6 +1579,45 @@ document.addEventListener('visibilitychange', () => {
   }
   checkNotifyNow();
 });
+
+/* ================= 아이폰 설치 안내 ================= */
+function showIOSBannerIfNeeded() {
+  const banner = $('#iosBanner');
+  const forced = /[?&]iosbanner\b/.test(location.search);   // PC에서 미리 보기용
+  if (!forced) {
+    if (!isIOS() || isStandalone()) return;
+    if (localStorage.getItem('diary.iosBannerOff') === '1') return;
+  }
+
+  banner.classList.remove('hidden');
+  document.body.classList.add('ios-banner-on');
+  $('#iosClose').onclick = () => {
+    banner.classList.add('hidden');
+    document.body.classList.remove('ios-banner-on');
+    localStorage.setItem('diary.iosBannerOff', '1');
+  };
+  $('#iosHow').onclick = () => {
+    const isSafari = !/CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent);
+    const sheet = openSheetHTML(`
+      <h3>홈 화면에 추가하기</h3>
+      ${isSafari ? '' : '<p class="desc" style="color:var(--danger)">지금 브라우저로는 추가할 수 없습니다.<br>주소를 복사해 <b>Safari</b>로 열어 주세요.</p>'}
+      <ol class="share-steps">
+        <li>화면 아래 <b>공유 버튼 (□↑)</b> 누르기</li>
+        <li>목록을 내려서 <b>홈 화면에 추가</b> 누르기</li>
+        <li>오른쪽 위 <b>추가</b> 누르기</li>
+      </ol>
+      <p class="desc">추가하면 아이콘으로 실행되고, 주소창 없이 앱처럼 뜹니다.</p>
+      <div class="sheet-actions">
+        <button class="btn-ghost" data-x="copy">주소 복사</button>
+        <button class="btn-main" data-x="ok">알겠습니다</button>
+      </div>`);
+    sheet.querySelector('[data-x="ok"]').onclick = () => closeTop();
+    sheet.querySelector('[data-x="copy"]').onclick = async () => {
+      try { await navigator.clipboard.writeText(location.href); toast('주소를 복사했습니다.'); }
+      catch { toast('복사에 실패했습니다. 주소창에서 직접 복사해 주세요.'); }
+    };
+  };
+}
 
 /* ================= 알림 ================= */
 function scheduleNotify() {
