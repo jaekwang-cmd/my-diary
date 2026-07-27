@@ -59,6 +59,23 @@ function relTime(ts) {
   const d = new Date(ts);
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () =>
+  window.navigator.standalone === true ||
+  window.matchMedia('(display-mode: standalone)').matches;
+
+/** 브라우저가 저장 공간을 함부로 비우지 않도록 요청.
+    특히 아이폰 Safari는 오래 안 쓰면 데이터를 정리할 수 있다. */
+async function requestPersistentStorage() {
+  try {
+    if (!navigator.storage?.persist) return null;
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch { return null; }
+}
+
 function parseTags(text) {
   const set = new Set();
   (String(text).match(/#[^\s#.,!?()[\]{}<>"']{1,30}/g) || [])
@@ -108,6 +125,7 @@ async function init() {
   refreshSettings();
   scheduleNotify();
   registerSW();
+  requestPersistentStorage();
 
   // 자동 백업: 앱 시작 시 1회 조용히
   if (S.get('autoSync') && Drive.isConfigured()) {
@@ -665,7 +683,9 @@ function bindSettings() {
     if (ev.target.checked) {
       if (!('Notification' in window)) {
         ev.target.checked = false;
-        toast('이 브라우저는 알림을 지원하지 않습니다.');
+        toast(isIOS() && !isStandalone()
+          ? '아이폰은 홈 화면에 추가한 뒤에만 알림을 쓸 수 있습니다.'
+          : '이 브라우저는 알림을 지원하지 않습니다.');
         return;
       }
       const perm = await Notification.requestPermission();
@@ -769,6 +789,24 @@ async function refreshSettings() {
   $('#vLastSync').textContent = relTime(await DB.getMeta('lastSync', 0));
   $('#vCount').textContent = (await DB.countEntries()) + '건';
   $('#vStorage').textContent = bytes(await DB.photoBytes());
+
+  const persisted = await requestPersistentStorage();
+  $('#vPersist').textContent =
+    persisted === true ? '보호됨' : persisted === false ? '보호 안 됨' : '알 수 없음';
+
+  const note = $('#iosNote');
+  if (isIOS() && !isStandalone()) {
+    note.hidden = false;
+    note.innerHTML = '아이폰에서는 <b>공유 → 홈 화면에 추가</b> 로 설치해서 쓰시는 걸 권합니다. '
+      + '설치하지 않고 Safari로만 열면, 오래 안 썼을 때 저장된 일기가 정리될 수 있습니다. '
+      + '<b>자동 백업</b>을 켜두면 더 안전합니다.';
+  } else if (persisted === false) {
+    note.hidden = false;
+    note.innerHTML = '브라우저가 저장 공간 보호를 아직 허용하지 않았습니다. '
+      + '홈 화면에 추가하거나 <b>자동 백업</b>을 켜두시길 권합니다.';
+  } else {
+    note.hidden = true;
+  }
 }
 
 /* ================= 구글 드라이브 ================= */
@@ -1537,7 +1575,9 @@ function scheduleNotify() {
   scheduleNotify._t = setTimeout(scheduleNotify, 60000);
 }
 async function checkNotifyNow() {
-  if (!S.get('notify') || Notification?.permission !== 'granted') return;
+  // 아이폰 Safari는 Notification 자체가 없을 수 있어 typeof 로 확인해야 한다
+  if (!S.get('notify')) return;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const [h, m] = S.get('notifyTime').split(':').map(Number);
   const now = new Date();
   const mins = now.getHours() * 60 + now.getMinutes();
@@ -1546,7 +1586,15 @@ async function checkNotifyNow() {
   if (localStorage.getItem('diary.notified') === today) return;
   if (entries.some(e => e.dt.slice(0, 10) === today)) return;
   localStorage.setItem('diary.notified', today);
+  showNotification('오늘의 일기', '오늘 하루를 기록해 보세요.');
+}
+
+/** 아이폰은 new Notification() 을 지원하지 않아 서비스워커 쪽을 먼저 쓴다 */
+async function showNotification(title, body) {
+  const opts = { body, icon: './icons/icon-192.png', badge: './icons/icon-192.png', tag: 'diary-daily' };
   try {
-    new Notification('오늘의 일기', { body: '오늘 하루를 기록해 보세요.', icon: './icons/icon-192.png', tag: 'diary-daily' });
-  } catch { /* 무시 */ }
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg?.showNotification) { await reg.showNotification(title, opts); return; }
+  } catch { /* 아래로 */ }
+  try { new Notification(title, opts); } catch (e) { console.warn('알림 표시 실패', e); }
 }
