@@ -969,7 +969,7 @@ function bindSettings() {
     <p class="desc">
       설치형 웹앱(PWA)입니다. 홈 화면에 추가하면 앱처럼 실행됩니다.<br>
       일기는 이 기기 안에 저장되며, 구글 드라이브에 백업하면 다른 기기에서도 볼 수 있습니다.<br><br>
-      version 1.3.0
+      version 1.4.0
     </p>
     <div class="sheet-actions"><button class="btn-main" data-x="ok">닫기</button></div>`)
     .querySelector('[data-x="ok"]').onclick = () => closeTop();
