@@ -15,6 +15,8 @@ export function clientId() {
   return (S.get('clientId') || DEFAULT_CLIENT_ID || '').trim();
 }
 export function isConfigured() { return !!clientId(); }
+/** 앱에 클라이언트 ID 가 내장돼 있는지 (사용자가 직접 입력한 게 아니라) */
+export function hasBuiltInClientId() { return !!(DEFAULT_CLIENT_ID || '').trim(); }
 export function isSignedIn() { return !!(token && token.exp > Date.now() + 30000); }
 
 function loadGIS() {

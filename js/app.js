@@ -900,6 +900,18 @@ function bindSettings() {
   };
 
   $('#rowDriveAuth').onclick = driveAuthTap;
+  $('#rowDriveOut').onclick = () => confirmSheet({
+    title: '구글 연결을 해제할까요?',
+    desc: '이 기기에서 로그아웃합니다. 드라이브에 올려둔 백업은 지워지지 않습니다.',
+    okText: '로그아웃',
+    danger: true,
+    onOk: () => {
+      Drive.signOut();
+      closeTop();
+      refreshSettings();
+      toast('로그아웃했습니다.');
+    },
+  });
   $('#rowBackup').onclick = () => runSync('sync');
   $('#rowRestore').onclick = () => confirmSheet({
     title: '드라이브에서 복원할까요?',
@@ -981,9 +993,11 @@ async function refreshSettings() {
   $('#vDriveUser').textContent = configured
     ? (S.get('driveEmail') || (Drive.isSignedIn() ? '연결됨' : '로그인 필요'))
     : '설정 필요';
+  const linked = configured && !!S.get('driveEmail');
   $('#tDriveAuth').textContent = configured
-    ? (S.get('driveEmail') ? '다른 계정으로 바꾸기 / 연결 해제' : '구글 계정 연결하기')
+    ? (linked ? '다른 계정으로 바꾸기' : '구글 계정 연결하기')
     : '구글 클라이언트 ID 입력하기';
+  $('#rowDriveOut').hidden = !linked;
   $('#driveNote').innerHTML = configured
     ? '드라이브의 <b>' + esc('심플일기장 백업') + '</b> 폴더에 저장됩니다. 다른 기기에서 같은 계정으로 연결하면 일기가 합쳐집니다.'
     : '연동하려면 구글 OAuth 클라이언트 ID가 필요합니다. 함께 만든 <b>SETUP.md</b> 파일의 순서를 따라 발급받으세요.';
@@ -1016,11 +1030,28 @@ async function refreshSettings() {
 }
 
 /* ================= 구글 드라이브 ================= */
+async function doGoogleLogin() {
+  try {
+    spin('구글 로그인 중…');
+    await Drive.auth(true);
+    await Drive.fetchEmail();
+    spinOff();
+    refreshSettings();
+    toast('연결되었습니다.');
+  } catch (e) { spinOff(); toast(e.message); }
+}
+
 function driveAuthTap() {
+  // 클라이언트 ID 가 앱에 들어 있으면 사용자는 그런 게 있는지도 몰라야 한다.
+  // 연결 전이면 곧장 구글 로그인 창으로 보낸다.
   if (!Drive.isConfigured()) return askClientId();
-  const opts = [{ label: '구글 계정 연결 / 다시 로그인', value: 'login' }];
-  if (S.get('driveEmail')) opts.push({ label: '연결 해제', value: 'out', danger: true });
-  opts.push({ label: '클라이언트 ID 다시 입력', value: 'id' });
+  if (!S.get('driveEmail')) return doGoogleLogin();
+
+  const opts = [
+    { label: '다른 구글 계정으로 바꾸기', value: 'login' },
+    { label: '연결 해제', value: 'out', danger: true },
+  ];
+  if (!Drive.hasBuiltInClientId()) opts.push({ label: '클라이언트 ID 다시 입력', value: 'id' });
   openSheet({
     title: '구글 드라이브',
     desc: S.get('driveEmail') || '',
@@ -1030,14 +1061,7 @@ function driveAuthTap() {
       await new Promise(r => setTimeout(r, 80));
       if (v === 'id') return askClientId();
       if (v === 'out') { Drive.signOut(); refreshSettings(); toast('연결을 해제했습니다.'); return; }
-      try {
-        spin('구글 로그인 중…');
-        await Drive.auth(true);
-        await Drive.fetchEmail();
-        spinOff();
-        refreshSettings();
-        toast('연결되었습니다.');
-      } catch (e) { spinOff(); toast(e.message); }
+      doGoogleLogin();
     },
   });
 }
