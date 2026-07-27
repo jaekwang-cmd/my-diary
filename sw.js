@@ -41,8 +41,10 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;   // 구글 API 등 외부 요청은 건드리지 않음
 
+  // cache:'no-cache' 를 줘야 브라우저 HTTP 캐시에 갇히지 않고
+  // 서버에 변경 여부를 물어본다. 이게 없으면 배포해도 옛 화면이 남는다.
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then(res => {
         if (res && res.ok && res.type === 'basic') {
           const clone = res.clone();

@@ -107,6 +107,18 @@ init();
 async function init() {
   S.applyTheme();
   await DB.openDB();
+
+  // 미리보기용: 주소 뒤에 ?demo 를 붙이면 샘플 일기를 채워 넣는다
+  if (/[?&]demo\b/.test(location.search)) {
+    spin('샘플 데이터를 넣는 중…');
+    try {
+      const { loadDemo } = await import('./demo.js');
+      const r = await loadDemo();
+      spinOff();
+      toast(r.skipped ? r.reason : `샘플 일기 ${r.count}건을 넣었습니다.`);
+    } catch (e) { spinOff(); console.error(e); }
+  }
+
   entries = await DB.allEntries();
 
   bindTabs();
