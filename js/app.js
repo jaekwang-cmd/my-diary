@@ -160,13 +160,12 @@ async function entryCard(e, highlight = '') {
   const p = dtParts(e.dt);
   const btn = document.createElement('button');
   btn.className = 'entry';
-  const h12 = p.H % 12 === 0 ? 12 : p.H % 12;
   const preview = e.body || '';
   btn.innerHTML = `
     <div class="e-date">
       <div class="e-dow">${DOW_EN[p.dow]}</div>
       <div class="e-day">${p.d}</div>
-      <div class="e-time">${h12}:${pad(p.M)}</div>
+      <div class="e-time">${p.H}:${pad(p.M)}</div>
     </div>
     <div class="e-main">
       ${e.title ? `<p class="e-title">${hl(e.title, highlight)}</p>` : ''}
@@ -176,7 +175,6 @@ async function entryCard(e, highlight = '') {
   if (e.photos?.length) {
     const img = document.createElement('img');
     img.className = 'e-thumb';
-    img.loading = 'lazy';
     const u = await DB.photoURL(e.photos[0]);
     if (u) img.src = u;
     btn.appendChild(img);
@@ -252,7 +250,7 @@ async function renderCalendar() {
         const withPhoto = list.find(e => e.photos?.length);
         if (withPhoto) {
           const img = document.createElement('img');
-          img.className = 'mini'; img.loading = 'lazy';
+          img.className = 'mini';
           DB.photoURL(withPhoto.photos[0]).then(u => { if (u) img.src = u; });
           cell.appendChild(img);
         } else {
@@ -330,13 +328,13 @@ function openEditor(entry) {
   $('#edTitle').value = editing.title || '';
   $('#edBody').value = editing.body || '';
   $('#edDate').textContent = fmtFull(editing.dt);
-  renderEditorPhotos();
   const page = $('#page-edit');
   page.classList.remove('hidden');
   pushPage(() => {
     page.classList.add('hidden');
     editing = null;
   });
+  renderEditorPhotos();
   if (!entry) setTimeout(() => $('#edBody').focus(), 120);
 }
 
@@ -451,22 +449,25 @@ async function openViewer(id) {
     <p class="vw-body">${esc(e.body)}</p>
     <div class="vw-photos" id="vwPhotos"></div>
     ${e.tags?.length ? `<div class="vw-tags">${e.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}`;
+  // 사진을 붙이기 전에 화면을 먼저 띄운다.
+  // 숨겨진(display:none) 상태에서 이미지를 붙이면 로딩이 지연돼 빈 칸으로 남는다.
+  const page = $('#page-view');
+  page.classList.remove('hidden');
+  pushPage(() => { page.classList.add('hidden'); viewingId = null; });
+
   const ph = $('#vwPhotos');
   for (const pid of (e.photos || [])) {
+    if (viewingId !== id) return;          // 그 사이 화면이 닫혔으면 중단
     const img = document.createElement('img');
-    img.loading = 'lazy';
     const u = await DB.photoURL(pid, 'full');
     if (u) img.src = u;
-    img.onclick = async () => {
+    img.onclick = () => {
       $('#lbImg').src = u;
       $('#lightbox').classList.remove('hidden');
       pushPage(() => $('#lightbox').classList.add('hidden'));
     };
     ph.appendChild(img);
   }
-  const page = $('#page-view');
-  page.classList.remove('hidden');
-  pushPage(() => { page.classList.add('hidden'); viewingId = null; });
 }
 
 /* ================= 검색 ================= */

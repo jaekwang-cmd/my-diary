@@ -32,23 +32,29 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+/* 네트워크 우선 + 캐시 대체.
+   캐시 우선으로 하면 코드를 고쳐 배포해도 폰에서 옛 화면이 계속 보입니다.
+   온라인이면 항상 최신을 받고, 오프라인이면 캐시로 동작합니다. */
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // 구글 API / 외부 요청은 캐시하지 않음
-  if (url.origin !== location.origin) return;
+  if (url.origin !== location.origin) return;   // 구글 API 등 외부 요청은 건드리지 않음
 
   e.respondWith(
-    caches.match(req).then(hit => {
-      const net = fetch(req).then(res => {
+    fetch(req)
+      .then(res => {
         if (res && res.ok && res.type === 'basic') {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(req, clone));
         }
         return res;
-      }).catch(() => hit || caches.match('./index.html'));
-      return hit || net;
-    })
+      })
+      .catch(async () => {
+        const hit = await caches.match(req);
+        if (hit) return hit;
+        if (req.mode === 'navigate') return caches.match('./index.html');
+        return new Response('', { status: 504, statusText: 'offline' });
+      })
   );
 });
