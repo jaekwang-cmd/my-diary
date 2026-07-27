@@ -99,6 +99,7 @@ async function init() {
   bindViewer();
   bindSearch();
   bindSettings();
+  bindStats();
 
   await maybeLock();
 
@@ -127,9 +128,10 @@ function bindTabs() {
 }
 function showTab(name) {
   $$('#tabbar .tab').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
-  ['list', 'cal', 'set'].forEach(n => $('#view-' + n).classList.toggle('hidden', n !== name));
-  $('#fab').classList.toggle('hidden', name === 'set');
+  ['list', 'cal', 'stat', 'set'].forEach(n => $('#view-' + n).classList.toggle('hidden', n !== name));
+  $('#fab').classList.toggle('hidden', name === 'set' || name === 'stat');
   if (name === 'set') refreshSettings();
+  if (name === 'stat') renderStats();
 }
 
 /* ================= 리스트 ================= */
@@ -170,6 +172,7 @@ async function entryCard(e, highlight = '') {
     <div class="e-main">
       ${e.title ? `<p class="e-title">${hl(e.title, highlight)}</p>` : ''}
       <p class="e-body">${hl(preview, highlight)}</p>
+      ${routineBadges(e)}
       ${e.tags?.length ? `<div class="e-tags">${e.tags.slice(0, 6).map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}
     </div>`;
   if (e.photos?.length) {
@@ -181,6 +184,15 @@ async function entryCard(e, highlight = '') {
   }
   btn.onclick = () => openViewer(e.id);
   return btn;
+}
+
+function routineBadges(e) {
+  const ids = S.effectiveRoutines(e);
+  if (!ids.length) return '';
+  const items = ids.map(id => S.routineById(id)).filter(Boolean);
+  if (!items.length) return '';
+  return `<div class="e-routines">${items.map(r =>
+    `<span class="rbadge" style="--cc:${r.color}">${r.emoji || ''} ${esc(r.name)}</span>`).join('')}</div>`;
 }
 
 function hl(text, q) {
@@ -297,6 +309,14 @@ function bindEditor() {
   $('#edSave').onclick = saveEditor;
   $('#edPhoto').onclick = () => $('#filePick').click();
   $('#edDate').onclick = pickDateTime;
+  // 본문에 #헬스 라고 쓰면 칩이 바로 켜지도록
+  let chipTimer = null;
+  const onType = () => {
+    clearTimeout(chipTimer);
+    chipTimer = setTimeout(() => { if (editing) renderRoutineChips(); }, 350);
+  };
+  $('#edBody').addEventListener('input', onType);
+  $('#edTitle').addEventListener('input', onType);
   $('#filePick').onchange = async (ev) => {
     const files = [...ev.target.files];
     ev.target.value = '';
@@ -322,11 +342,12 @@ function bindEditor() {
 
 function openEditor(entry) {
   editing = entry
-    ? { ...entry, photos: [...(entry.photos || [])] }
-    : { id: DB.uid(), dt: nowDT(), title: '', body: '', photos: [], tags: [], createdAt: Date.now() };
+    ? { ...entry, photos: [...(entry.photos || [])], routines: [...(entry.routines || [])] }
+    : { id: DB.uid(), dt: nowDT(), title: '', body: '', photos: [], routines: [], tags: [], createdAt: Date.now() };
   editing._orig = entry ? entry.photos || [] : [];
   $('#edTitle').value = editing.title || '';
   $('#edBody').value = editing.body || '';
+  renderRoutineChips();
   $('#edDate').textContent = fmtFull(editing.dt);
   const page = $('#page-edit');
   page.classList.remove('hidden');
@@ -357,6 +378,42 @@ async function renderEditorPhotos() {
     div.append(img, x);
     box.appendChild(div);
   }
+}
+
+/** 편집 화면의 루틴 칩. 본문에 #헬스 라고 쓰면 자동으로 켜진 상태로 보인다 */
+function renderRoutineChips() {
+  const box = $('#edRoutines');
+  box.innerHTML = '';
+  const list = S.get('routines') || [];
+  const autoOn = new Set(S.effectiveRoutines({
+    routines: [],
+    tags: parseTags(($('#edTitle').value || '') + ' ' + ($('#edBody').value || '')),
+  }));
+
+  for (const r of list) {
+    const picked = editing.routines.includes(r.id);
+    const auto = autoOn.has(r.id) && !picked;
+    const b = document.createElement('button');
+    b.className = 'chip' + (picked || auto ? ' on' : '') + (auto ? ' auto' : '');
+    b.style.setProperty('--cc', r.color);
+    b.innerHTML = `<span class="em">${r.emoji || '·'}</span><span>${esc(r.name)}</span>`
+      + (auto ? '<span class="auto-mark">#</span>' : '');
+    b.title = auto ? '본문 해시태그로 자동 인식됨' : '';
+    b.onclick = () => {
+      if (auto) { toast(`본문의 #${r.tag || r.name} 로 이미 기록됩니다.`); return; }
+      editing.routines = picked
+        ? editing.routines.filter(x => x !== r.id)
+        : [...editing.routines, r.id];
+      renderRoutineChips();
+    };
+    box.appendChild(b);
+  }
+
+  const add = document.createElement('button');
+  add.className = 'chip chip-add';
+  add.textContent = list.length ? '+ 편집' : '+ 루틴 만들기';
+  add.onclick = () => manageRoutines(() => renderRoutineChips());
+  box.appendChild(add);
 }
 
 function pickDateTime() {
@@ -393,6 +450,7 @@ async function saveEditor() {
     title,
     body,
     photos: editing.photos,
+    routines: editing.routines,
     tags: parseTags(title + ' ' + body),
     createdAt: editing.createdAt || Date.now(),
     updatedAt: Date.now(),
@@ -446,6 +504,7 @@ async function openViewer(id) {
   const box = $('#vwScroll');
   box.innerHTML = `
     ${e.title ? `<h2 class="vw-title">${esc(e.title)}</h2>` : ''}
+    ${routineBadges(e)}
     <p class="vw-body">${esc(e.body)}</p>
     <div class="vw-photos" id="vwPhotos"></div>
     ${e.tags?.length ? `<div class="vw-tags">${e.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}`;
@@ -522,6 +581,13 @@ function openSheetHTML(html) {
   pushPage(() => wrap.classList.add('hidden'));
   return $('#sheet');
 }
+/** 이미 열린 시트의 내용만 교체 (뒤로가기 단계를 늘리지 않음) */
+function setSheet(html) {
+  $('#sheet').innerHTML = html;
+  $('#sheet').scrollTop = 0;
+  return $('#sheet');
+}
+const sheetIsOpen = () => !$('#sheetWrap').classList.contains('hidden');
 function openSheet({ title, desc, options, onPick }) {
   const html = `
     ${title ? `<h3>${esc(title)}</h3>` : ''}
@@ -660,8 +726,8 @@ function bindSettings() {
       await DB.wipeAll();
       entries = [];
       closeTop();
-      renderList(); renderCalendar(); refreshSettings();
-      toast('삭제했습니다.');
+      renderList(); renderCalendar(); renderStats(); refreshSettings();
+      toast('삭제했습니다. 루틴과 D-DAY는 그대로 있습니다.');
     },
   });
   $('#rowAbout').onclick = () => openSheetHTML(`
@@ -669,7 +735,7 @@ function bindSettings() {
     <p class="desc">
       설치형 웹앱(PWA)입니다. 홈 화면에 추가하면 앱처럼 실행됩니다.<br>
       일기는 이 기기 안에 저장되며, 구글 드라이브에 백업하면 다른 기기에서도 볼 수 있습니다.<br><br>
-      version 1.0.0
+      version 1.1.0
     </p>
     <div class="sheet-actions"><button class="btn-main" data-x="ok">닫기</button></div>`)
     .querySelector('[data-x="ok"]').onclick = () => closeTop();
@@ -755,12 +821,13 @@ async function runSync(mode) {
     const r = await Drive.sync(mode, spinText);
     entries = await DB.allEntries();
     spinOff();
-    renderList(); renderCalendar(); refreshSettings();
+    renderList(); renderCalendar(); renderStats(); refreshSettings();
     const bits = [];
     if (r.added) bits.push(`새 일기 ${r.added}건`);
     if (r.updated) bits.push(`갱신 ${r.updated}건`);
     if (r.pulled) bits.push(`사진 ${r.pulled}장 받음`);
     if (r.pushed) bits.push(`사진 ${r.pushed}장 올림`);
+    if (r.catalog) bits.push('루틴 · D-DAY 갱신');
     toast(bits.length ? bits.join(' · ') : (mode === 'sync' ? '백업 완료 (변경 없음)' : '이미 최신입니다'));
   } catch (e) {
     spinOff();
@@ -779,7 +846,7 @@ async function quietSync() {
   try {
     await Drive.sync('sync', () => {});
     entries = await DB.allEntries();
-    renderList(); renderCalendar(); refreshSettings();
+    renderList(); renderCalendar(); renderStats(); refreshSettings();
   } catch (e) { console.warn('자동 백업 실패', e.message); }
 }
 
@@ -797,10 +864,13 @@ async function doExport() {
 
     for (const e of list) {
       (e.photos || []).forEach(p => usedPhotos.add(p));
+      const rNames = S.effectiveRoutines(e).map(id => S.routineById(id)).filter(Boolean)
+        .map(r => `${r.emoji || ''} ${r.name}`).join(', ');
       const md = [
         `# ${e.title || '(제목 없음)'}`,
         '',
         fmtFull(e.dt),
+        ...(rNames ? ['', `루틴: ${rNames}`] : []),
         '',
         e.body || '',
         '',
@@ -821,6 +891,7 @@ async function doExport() {
       data: JSON.stringify({
         version: 1, app: 'simple-diary', exportedAt: new Date().toISOString(),
         entries: list, tombstones: await DB.getMeta('tombstones', []),
+        catalog: S.getCatalog(),
       }, null, 1),
     });
 
@@ -886,15 +957,426 @@ function doImport() {
         if (!cur) { await DB.putEntry(e); added++; }
         else if ((e.updatedAt || 0) > (cur.updatedAt || 0)) { await DB.putEntry(e); updated++; }
       }
+      // 루틴 · D-DAY 카탈로그도 최신 것으로
+      let catMsg = '';
+      const rc = bundle.catalog;
+      if (rc && (rc.catalogAt || 0) > (S.getCatalog().catalogAt || 0)) {
+        S.saveCatalog({ routines: rc.routines || [], ddays: rc.ddays || [] }, rc.catalogAt);
+        catMsg = ' · 루틴/D-DAY 복원';
+      }
+
       entries = await DB.allEntries();
       spinOff();
-      renderList(); renderCalendar(); refreshSettings();
-      toast(`가져오기 완료 · 새 일기 ${added}건, 갱신 ${updated}건`);
+      renderList(); renderCalendar(); renderStats(); refreshSettings();
+      toast(`가져오기 완료 · 새 일기 ${added}건, 갱신 ${updated}건${catMsg}`);
     } catch (e) {
       spinOff(); toast(e.message || '가져오기에 실패했습니다.'); console.error(e);
     }
   };
   inp.click();
+}
+
+/* ================= 통계 ================= */
+let statCursor = new Date();
+
+function bindStats() {
+  $('#statPrev').onclick = () => { statCursor.setMonth(statCursor.getMonth() - 1); renderStats(); };
+  $('#statNext').onclick = () => { statCursor.setMonth(statCursor.getMonth() + 1); renderStats(); };
+  $('#statTitle').onclick = () => { statCursor = new Date(); renderStats(); };
+  $('#statCfg').onclick = statsConfigSheet;
+  $('#rowStatCfg').onclick = statsConfigSheet;
+  $('#rowManageRoutine').onclick = () => manageRoutines(() => renderStats());
+  $('#rowManageDday').onclick = () => manageDdays(() => renderStats());
+}
+
+/* 날짜 계산 (시차·서머타임 영향 없게 UTC 기준으로) */
+function ymdToUTC(s) {
+  const [y, m, d] = String(s).split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+function diffDays(a, b) { return Math.round((ymdToUTC(b) - ymdToUTC(a)) / 86400000); }
+function fmtYMD(s) {
+  const [y, m, d] = String(s).split('-');
+  return `${y}.${Number(m)}.${Number(d)}`;
+}
+function shiftYMD(s, n) {
+  const d = new Date(ymdToUTC(s) + n * 86400000);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+function visibleRoutines() {
+  const hidden = new Set(S.get('hiddenRoutines') || []);
+  return (S.get('routines') || []).filter(r => !hidden.has(r.id));
+}
+
+function renderStats() {
+  const y = statCursor.getFullYear(), m = statCursor.getMonth();
+  const mk = `${y}-${pad(m + 1)}`;
+  $('#statTitle').textContent = `${y}년 ${m + 1}월`;
+  const sec = S.get('statsSections') || {};
+  const monthEntries = entries.filter(e => e.dt.slice(0, 7) === mk);
+
+  renderStatSummary(sec.summary !== false, monthEntries);
+  renderStatCounts(sec.counts !== false, monthEntries);
+  renderStatHeatmap(sec.heatmap !== false, y, m);
+  renderStatDday(sec.dday !== false);
+
+  $('#vRoutineCount').textContent = (S.get('routines') || []).length + '개';
+  $('#vDdayCount').textContent = (S.get('ddays') || []).length + '개';
+}
+
+function renderStatSummary(show, monthEntries) {
+  const box = $('#statSummary');
+  if (!show) { box.innerHTML = ''; return; }
+  const days = new Set(monthEntries.map(e => e.dt.slice(0, 10))).size;
+  const photos = monthEntries.reduce((n, e) => n + (e.photos?.length || 0), 0);
+
+  // 오늘(또는 어제)부터 거꾸로 이어진 작성 일수
+  const written = new Set(entries.map(e => e.dt.slice(0, 10)));
+  let cur = todayYMD(), streak = 0;
+  if (!written.has(cur)) cur = shiftYMD(cur, -1);
+  while (written.has(cur)) { streak++; cur = shiftYMD(cur, -1); }
+
+  box.innerHTML = `
+    <div class="tiles">
+      <div class="tile"><b>${days}</b><span>이번 달 쓴 날</span></div>
+      <div class="tile"><b>${streak}</b><span>연속 기록</span></div>
+      <div class="tile"><b>${photos}</b><span>사진</span></div>
+    </div>`;
+}
+
+function renderStatCounts(show, monthEntries) {
+  const box = $('#statCounts');
+  const list = visibleRoutines();
+  if (!show || !list.length) { box.innerHTML = ''; return; }
+
+  const cnt = new Map(), dayset = new Map();
+  for (const e of monthEntries) {
+    for (const id of S.effectiveRoutines(e)) {
+      cnt.set(id, (cnt.get(id) || 0) + 1);
+      if (!dayset.has(id)) dayset.set(id, new Set());
+      dayset.get(id).add(e.dt.slice(0, 10));
+    }
+  }
+  const max = Math.max(1, ...list.map(r => cnt.get(r.id) || 0));
+  const rows = list.map(r => {
+    const n = cnt.get(r.id) || 0;
+    const d = dayset.get(r.id)?.size || 0;
+    return `<div class="barrow" style="--cc:${r.color}">
+      <span class="em">${r.emoji || '·'}</span>
+      <span class="nm">${esc(r.name)}</span>
+      <span class="track"><span class="fill" style="width:${(n / max) * 100}%"></span></span>
+      <span class="cnt">${n}번<br><s>${d}일</s></span>
+    </div>`;
+  }).join('');
+  box.innerHTML = `<div class="sec-label">이번 달 루틴</div><div class="barlist">${rows}</div>`;
+}
+
+function renderStatHeatmap(show, y, m) {
+  const box = $('#statHeatmap');
+  const list = visibleRoutines();
+  if (!show || !list.length) { box.innerHTML = ''; return; }
+
+  const byDay = new Map();
+  for (const e of entries) {
+    const d = e.dt.slice(0, 10);
+    if (d.slice(0, 7) !== `${y}-${pad(m + 1)}`) continue;
+    if (!byDay.has(d)) byDay.set(d, new Set());
+    S.effectiveRoutines(e).forEach(id => byDay.get(d).add(id));
+  }
+  const colorOf = new Map(list.map(r => [r.id, r.color]));
+
+  const ws = S.get('weekStart');
+  const first = new Date(y, m, 1);
+  const start = new Date(first);
+  start.setDate(1 - ((first.getDay() - ws + 7) % 7));
+
+  let html = '<div class="heat-row">';
+  for (let i = 0; i < 7; i++) html += `<div class="heat-dow">${DOW_KO[(ws + i) % 7]}</div>`;
+  html += '</div>';
+
+  for (let w = 0; w < 6; w++) {
+    let row = '';
+    let anyIn = false;
+    for (let i = 0; i < 7; i++) {
+      const dd = new Date(start);
+      dd.setDate(start.getDate() + w * 7 + i);
+      const key = `${dd.getFullYear()}-${pad(dd.getMonth() + 1)}-${pad(dd.getDate())}`;
+      const out = dd.getMonth() !== m;
+      if (!out) anyIn = true;
+      const ids = [...(byDay.get(key) || [])].filter(id => colorOf.has(id)).slice(0, 4);
+      row += `<div class="heat-cell ${out ? 'out' : ''} ${ids.length ? 'hasday' : ''}">
+        <span>${dd.getDate()}</span>
+        <span class="dots">${ids.map(id => `<i style="--cc:${colorOf.get(id)}"></i>`).join('')}</span>
+      </div>`;
+    }
+    if (!anyIn) break;
+    html += `<div class="heat-row">${row}</div>`;
+  }
+  box.innerHTML = `<div class="sec-label">루틴 달력</div><div class="heat">${html}</div>`;
+}
+
+function ddayText(d) {
+  const today = todayYMD();
+  if (d.end) {
+    const total = diffDays(d.start, d.end) + 1;
+    return { big: `총 ${total}일`, sub: `${fmtYMD(d.start)} ~ ${fmtYMD(d.end)}`, chip: '종료', done: true };
+  }
+  const n = diffDays(d.start, today);
+  if (n >= 0) return { big: `D+${n}`, sub: `${fmtYMD(d.start)}부터 · ${n + 1}일째`, chip: '진행 중', done: false };
+  return { big: `D${n}`, sub: `${fmtYMD(d.start)} 시작 예정`, chip: '예정', done: false };
+}
+
+function renderStatDday(show) {
+  const box = $('#statDday');
+  const list = S.get('ddays') || [];
+  if (!show) { box.innerHTML = ''; return; }
+  if (!list.length) {
+    box.innerHTML = `<div class="sec-label">D-DAY</div>
+      <button class="mini-add" id="ddAddEmpty">+ D-DAY 만들기 (연애·금연·기념일…)</button>`;
+    $('#ddAddEmpty').onclick = () => manageDdays(() => renderStats(), true);
+    return;
+  }
+  const sorted = [...list].sort((a, b) => (a.end ? 1 : 0) - (b.end ? 1 : 0) || (a.start < b.start ? 1 : -1));
+  box.innerHTML = `<div class="sec-label">D-DAY</div><div class="dday-list">${sorted.map(d => {
+    const t = ddayText(d);
+    return `<button class="dcard ${t.done ? 'done' : ''}" data-id="${d.id}" style="--cc:${d.color}">
+      <span class="dchip">${t.chip}</span>
+      <span class="dn">${d.emoji || '📌'} ${esc(d.name)}</span>
+      <div class="dbig">${t.big}</div>
+      <div class="dsub">${t.sub}</div>
+    </button>`;
+  }).join('')}</div>
+  <button class="mini-add" id="ddAdd">+ D-DAY 추가</button>`;
+  $$('#statDday .dcard').forEach(b => b.onclick = () => {
+    const d = (S.get('ddays') || []).find(x => x.id === b.dataset.id);
+    if (d) editDday(d, () => renderStats());
+  });
+  $('#ddAdd').onclick = () => manageDdays(() => renderStats(), true);
+}
+
+/* ---------- 통계 표시 항목 ---------- */
+function statsConfigSheet() {
+  const SECTIONS = [
+    ['summary', '요약 (쓴 날 · 연속 기록 · 사진)'],
+    ['counts', '이번 달 루틴 횟수'],
+    ['heatmap', '루틴 달력'],
+    ['dday', 'D-DAY'],
+  ];
+  const draw = () => {
+    const sec = S.get('statsSections') || {};
+    const hidden = new Set(S.get('hiddenRoutines') || []);
+    const routines = S.get('routines') || [];
+    const html = `
+      <h3>통계 표시 항목</h3>
+      <p class="desc">보고 싶지 않은 항목을 꺼두면 통계 화면에서 사라집니다.</p>
+      ${SECTIONS.map(([k, label]) =>
+        `<button class="opt ${sec[k] !== false ? 'on' : ''}" data-sec="${k}">
+           <span>${label}</span>${sec[k] !== false ? '<span class="chk">✓</span>' : '<span class="chk" style="opacity:.35">숨김</span>'}
+         </button>`).join('')}
+      ${routines.length ? `<div class="field-label">통계에 넣을 루틴</div>` : ''}
+      ${routines.map(r =>
+        `<button class="opt ${!hidden.has(r.id) ? 'on' : ''}" data-rt="${r.id}">
+           <span class="swatch" style="background:${r.color}"></span>
+           <span>${r.emoji || ''} ${esc(r.name)}</span>
+           ${!hidden.has(r.id) ? '<span class="chk">✓</span>' : '<span class="chk" style="opacity:.35">숨김</span>'}
+         </button>`).join('')}
+      <div class="sheet-actions"><button class="btn-main" data-x="ok">완료</button></div>`;
+    const s = sheetIsOpen() ? setSheet(html) : openSheetHTML(html);
+    $$('[data-sec]', s).forEach(b => b.onclick = () => {
+      const cur = { ...(S.get('statsSections') || {}) };
+      cur[b.dataset.sec] = cur[b.dataset.sec] === false;
+      S.set('statsSections', cur);
+      renderStats(); draw();
+    });
+    $$('[data-rt]', s).forEach(b => b.onclick = () => {
+      const h = new Set(S.get('hiddenRoutines') || []);
+      h.has(b.dataset.rt) ? h.delete(b.dataset.rt) : h.add(b.dataset.rt);
+      S.set('hiddenRoutines', [...h]);
+      renderStats(); draw();
+    });
+    s.querySelector('[data-x="ok"]').onclick = () => closeTop();
+  };
+  draw();
+}
+
+/* ---------- 루틴 카탈로그 ---------- */
+function manageRoutines(onDone = () => {}) {
+  const draw = () => {
+    const list = S.get('routines') || [];
+    const html = `
+      <h3>루틴 카탈로그</h3>
+      <p class="desc">일기 쓸 때 탭해서 붙일 수 있습니다.<br>본문에 <b>#이름</b> 을 써도 자동으로 기록됩니다.</p>
+      ${list.map(r => `
+        <button class="mrow" data-id="${r.id}">
+          <span class="em">${r.emoji || '·'}</span>
+          <span class="nm">${esc(r.name)}<span class="sub">#${esc(r.tag || r.name)} 로도 인식</span></span>
+          <span class="dot-c" style="--cc:${r.color}"></span>
+        </button>`).join('')
+      || '<p class="desc">아직 루틴이 없습니다.</p>'}
+      <div class="sheet-actions">
+        <button class="btn-ghost" data-x="add">+ 새 루틴</button>
+        <button class="btn-main" data-x="ok">완료</button>
+      </div>`;
+    const s = sheetIsOpen() ? setSheet(html) : openSheetHTML(html);
+    $$('.mrow', s).forEach(b => b.onclick = () => {
+      const r = (S.get('routines') || []).find(x => x.id === b.dataset.id);
+      editRoutine(r, draw, onDone);
+    });
+    s.querySelector('[data-x="add"]').onclick = () => editRoutine(null, draw, onDone);
+    s.querySelector('[data-x="ok"]').onclick = () => closeTop();
+  };
+  draw();
+}
+
+function editRoutine(routine, back, onDone) {
+  const isNew = !routine;
+  let draft = routine
+    ? { ...routine }
+    : { id: S.newId('r'), name: '', emoji: '💪', color: S.THEMES[0].c, tag: '' };
+
+  const draw = () => {
+    const html = `
+      <h3>${isNew ? '새 루틴' : '루틴 편집'}</h3>
+      <div class="field-label">이름</div>
+      <input type="text" id="rtName" value="${esc(draft.name)}" placeholder="예: 헬스">
+      <div class="field-label">해시태그 (본문에 이렇게 쓰면 자동 인식)</div>
+      <input type="text" id="rtTag" value="${esc(draft.tag)}" placeholder="비워두면 이름과 같게">
+      <div class="field-label">아이콘</div>
+      <div class="emoji-grid">${S.ROUTINE_EMOJIS.map(e =>
+        `<button data-em="${e}" class="${e === draft.emoji ? 'on' : ''}">${e}</button>`).join('')}</div>
+      <div class="field-label">색</div>
+      <div class="color-grid">${S.THEMES.map(t =>
+        `<button data-col="${t.c}" style="background:${t.c}" class="${t.c === draft.color ? 'on' : ''}"></button>`).join('')}</div>
+      <div class="sheet-actions">
+        ${isNew ? '' : '<button class="btn-danger" data-x="del">삭제</button>'}
+        <button class="btn-ghost" data-x="cancel">취소</button>
+        <button class="btn-main" data-x="save">저장</button>
+      </div>`;
+    const s = setSheet(html);
+    const sync = () => { draft.name = s.querySelector('#rtName').value; draft.tag = s.querySelector('#rtTag').value; };
+    $$('[data-em]', s).forEach(b => b.onclick = () => { sync(); draft.emoji = b.dataset.em; draw(); });
+    $$('[data-col]', s).forEach(b => b.onclick = () => { sync(); draft.color = b.dataset.col; draw(); });
+    s.querySelector('[data-x="cancel"]').onclick = back;
+    s.querySelector('[data-x="save"]').onclick = () => {
+      sync();
+      const name = draft.name.trim();
+      if (!name) { toast('이름을 입력해 주세요.'); return; }
+      draft.name = name;
+      draft.tag = (draft.tag || '').trim().replace(/^#/, '') || name;
+      const list = [...(S.get('routines') || [])];
+      const i = list.findIndex(x => x.id === draft.id);
+      if (i >= 0) list[i] = draft; else list.push(draft);
+      S.saveCatalog({ routines: list });
+      onDone(); renderList(); autoSyncSoon();
+      back();
+    };
+    if (!isNew) s.querySelector('[data-x="del"]').onclick = () => {
+      const list = (S.get('routines') || []).filter(x => x.id !== draft.id);
+      S.saveCatalog({ routines: list });
+      S.set('hiddenRoutines', (S.get('hiddenRoutines') || []).filter(x => x !== draft.id));
+      onDone(); renderList(); autoSyncSoon();
+      toast('삭제했습니다. 기존 일기 내용은 그대로 있습니다.');
+      back();
+    };
+  };
+  draw();
+}
+
+/* ---------- D-DAY ---------- */
+function manageDdays(onDone = () => {}, straightToNew = false) {
+  const draw = () => {
+    const list = S.get('ddays') || [];
+    const html = `
+      <h3>D-DAY</h3>
+      <p class="desc">시작일부터 며칠 됐는지 세어 줍니다.<br>종료일을 넣으면 총 며칠이었는지로 바뀝니다.</p>
+      ${list.map(d => {
+        const t = ddayText(d);
+        return `<button class="mrow" data-id="${d.id}">
+          <span class="em">${d.emoji || '📌'}</span>
+          <span class="nm">${esc(d.name)}<span class="sub">${t.big} · ${t.sub}</span></span>
+          <span class="dot-c" style="--cc:${d.color}"></span>
+        </button>`;
+      }).join('') || '<p class="desc">아직 없습니다.</p>'}
+      <div class="sheet-actions">
+        <button class="btn-ghost" data-x="add">+ 새 D-DAY</button>
+        <button class="btn-main" data-x="ok">완료</button>
+      </div>`;
+    const s = sheetIsOpen() ? setSheet(html) : openSheetHTML(html);
+    $$('.mrow', s).forEach(b => b.onclick = () => {
+      const d = (S.get('ddays') || []).find(x => x.id === b.dataset.id);
+      editDdayForm(d, draw, onDone);
+    });
+    s.querySelector('[data-x="add"]').onclick = () => editDdayForm(null, draw, onDone);
+    s.querySelector('[data-x="ok"]').onclick = () => closeTop();
+  };
+  draw();
+  if (straightToNew) editDdayForm(null, draw, onDone);
+}
+
+/** 통계 카드를 바로 눌렀을 때: 목록 시트를 연 뒤 곧장 편집 폼으로 */
+function editDday(d, onDone) {
+  manageDdays(onDone);
+  editDdayForm(d, () => manageDdays(onDone), onDone);
+}
+
+function editDdayForm(dday, back, onDone) {
+  const isNew = !dday;
+  let draft = dday
+    ? { ...dday }
+    : { id: S.newId('d'), name: '', emoji: '❤️', color: S.THEMES[6].c, start: todayYMD(), end: '' };
+
+  const draw = () => {
+    const html = `
+      <h3>${isNew ? '새 D-DAY' : 'D-DAY 편집'}</h3>
+      <div class="field-label">이름</div>
+      <input type="text" id="ddName" value="${esc(draft.name)}" placeholder="예: 민지와 연애">
+      <div class="field-label">시작일</div>
+      <input type="date" id="ddStart" value="${esc(draft.start)}">
+      <div class="field-label">종료일 (진행 중이면 비워 두세요)</div>
+      <input type="date" id="ddEnd" value="${esc(draft.end || '')}">
+      <div class="field-label">아이콘</div>
+      <div class="emoji-grid">${['❤️', '💍', '🎂', '✈️', '🚭', '💪', '📚', '💼', '🏠', '🐶', '🎓', '💰', '🎯', '⏰', '📌', '🌱'].map(e =>
+        `<button data-em="${e}" class="${e === draft.emoji ? 'on' : ''}">${e}</button>`).join('')}</div>
+      <div class="field-label">색</div>
+      <div class="color-grid">${S.THEMES.map(t =>
+        `<button data-col="${t.c}" style="background:${t.c}" class="${t.c === draft.color ? 'on' : ''}"></button>`).join('')}</div>
+      <div class="sheet-actions">
+        ${isNew ? '' : '<button class="btn-danger" data-x="del">삭제</button>'}
+        <button class="btn-ghost" data-x="cancel">취소</button>
+        <button class="btn-main" data-x="save">저장</button>
+      </div>`;
+    const s = setSheet(html);
+    const sync = () => {
+      draft.name = s.querySelector('#ddName').value;
+      draft.start = s.querySelector('#ddStart').value;
+      draft.end = s.querySelector('#ddEnd').value;
+    };
+    $$('[data-em]', s).forEach(b => b.onclick = () => { sync(); draft.emoji = b.dataset.em; draw(); });
+    $$('[data-col]', s).forEach(b => b.onclick = () => { sync(); draft.color = b.dataset.col; draw(); });
+    s.querySelector('[data-x="cancel"]').onclick = back;
+    s.querySelector('[data-x="save"]').onclick = () => {
+      sync();
+      const name = draft.name.trim();
+      if (!name) { toast('이름을 입력해 주세요.'); return; }
+      if (!draft.start) { toast('시작일을 골라 주세요.'); return; }
+      if (draft.end && diffDays(draft.start, draft.end) < 0) { toast('종료일이 시작일보다 빠릅니다.'); return; }
+      draft.name = name;
+      const list = [...(S.get('ddays') || [])];
+      const i = list.findIndex(x => x.id === draft.id);
+      if (i >= 0) list[i] = draft; else list.push(draft);
+      S.saveCatalog({ ddays: list });
+      onDone(); autoSyncSoon();
+      back();
+    };
+    if (!isNew) s.querySelector('[data-x="del"]').onclick = () => {
+      S.saveCatalog({ ddays: (S.get('ddays') || []).filter(x => x.id !== draft.id) });
+      onDone(); autoSyncSoon();
+      toast('삭제했습니다.');
+      back();
+    };
+  };
+  draw();
 }
 
 /* ================= 패스코드 잠금 ================= */

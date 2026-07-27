@@ -123,7 +123,7 @@ mark{background:color-mix(in srgb,var(--accent) 34%,transparent);color:inherit;b
 /* ===== 탭바 / FAB ===== */
 .tabbar{
   position:fixed;left:0;right:0;bottom:0;z-index:20;
-  display:grid;grid-template-columns:repeat(3,1fr);
+  display:grid;grid-template-columns:repeat(4,1fr);
   background:var(--topbar);border-top:1px solid var(--line);
   padding-bottom:var(--safe-b);
 }
@@ -208,6 +208,83 @@ html[data-dark="1"] .sw i{background:#3a4047}
 .keypad b{font-size:1.42rem;font-weight:600}
 .keypad s{font-size:.55rem;letter-spacing:1.2px;color:var(--ink3);text-decoration:none;margin-top:2px}
 
+/* ===== 루틴 칩 ===== */
+.chiprow{display:flex;gap:7px;overflow-x:auto;padding:4px 0 12px;margin-bottom:2px;scrollbar-width:none}
+.chiprow::-webkit-scrollbar{display:none}
+.chip{
+  display:flex;align-items:center;gap:5px;flex:none;
+  padding:7px 13px;border-radius:999px;font-size:.85rem;font-weight:600;
+  background:var(--line2);color:var(--ink2);
+  box-shadow:inset 0 0 0 1px transparent;transition:.12s;
+}
+.chip .em{font-size:.95rem;line-height:1}
+.chip.on{background:color-mix(in srgb,var(--cc,var(--accent)) 17%,transparent);color:var(--cc,var(--accent));box-shadow:inset 0 0 0 1.5px var(--cc,var(--accent))}
+.chip:active{transform:scale(.94)}
+.chip.auto{opacity:.95}
+.chip .auto-mark{font-size:.62rem;font-weight:700;opacity:.75}
+.chip-add{background:none;box-shadow:inset 0 0 0 1.5px var(--line);color:var(--ink3)}
+
+/* 리스트 카드 안의 루틴 뱃지 */
+.e-routines{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.rbadge{display:inline-flex;align-items:center;gap:3px;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:6px;
+  background:color-mix(in srgb,var(--cc) 16%,transparent);color:var(--cc)}
+
+/* ===== 통계 ===== */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:14px 14px 4px}
+.tile{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 8px;text-align:center}
+.tile b{display:block;font-size:1.5rem;font-weight:800;letter-spacing:-1px;color:var(--accent);line-height:1.15}
+.tile span{display:block;font-size:.72rem;color:var(--ink2);margin-top:3px}
+
+.barlist{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.barrow{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid var(--line2)}
+.barrow:last-child{border-bottom:0}
+.barrow .em{width:24px;text-align:center;font-size:1.05rem;flex:none}
+.barrow .nm{width:66px;font-size:.87rem;font-weight:600;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.barrow .track{flex:1;height:9px;border-radius:999px;background:var(--line2);overflow:hidden}
+.barrow .fill{height:100%;border-radius:999px;background:var(--cc);transition:width .35s}
+.barrow .cnt{width:46px;text-align:right;font-size:.86rem;font-weight:700;flex:none}
+.barrow .cnt s{text-decoration:none;font-weight:400;color:var(--ink3);font-size:.76rem}
+
+.heat{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px 0 12px}
+.heat-row{display:grid;grid-template-columns:repeat(7,1fr)}
+.heat-dow{text-align:center;font-size:.68rem;color:var(--ink3);padding:5px 0}
+.heat-cell{height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:.7rem;color:var(--ink3)}
+.heat-cell.out{opacity:.25}
+.heat-cell .dots{display:flex;gap:2px;height:7px;align-items:center}
+.heat-cell .dots i{width:6px;height:6px;border-radius:50%;background:var(--cc)}
+.heat-cell.hasday{color:var(--ink)}
+
+.dday-list{display:flex;flex-direction:column;gap:10px;padding:12px 14px 4px}
+.dcard{
+  position:relative;overflow:hidden;border-radius:16px;padding:16px 17px;
+  background:var(--cc);color:#fff;box-shadow:0 3px 12px color-mix(in srgb,var(--cc) 35%,transparent);
+  text-align:left;width:100%;
+}
+.dcard.done{background:var(--line);color:var(--ink2);box-shadow:none}
+.dcard .dn{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.95rem}
+.dcard .dbig{font-size:2rem;font-weight:800;letter-spacing:-1.5px;margin-top:6px;line-height:1.1}
+.dcard .dsub{font-size:.76rem;opacity:.85;margin-top:3px}
+.dcard .dchip{position:absolute;top:14px;right:15px;font-size:.66rem;font-weight:700;background:rgba(255,255,255,.25);padding:3px 8px;border-radius:99px}
+.dcard.done .dchip{background:color-mix(in srgb,var(--ink3) 22%,transparent)}
+
+.mini-add{display:block;width:calc(100% - 28px);margin:10px 14px 0;padding:13px;border-radius:12px;
+  background:var(--line2);color:var(--ink2);font-size:.88rem;font-weight:600;text-align:center}
+.mini-add:active{background:var(--line)}
+
+/* 관리 시트의 항목 */
+.mrow{display:flex;align-items:center;gap:11px;padding:12px 20px;border-top:1px solid var(--line2);width:100%;text-align:left}
+.mrow .em{font-size:1.15rem;width:26px;text-align:center;flex:none}
+.mrow .nm{flex:1;font-size:.94rem;font-weight:600}
+.mrow .sub{font-size:.76rem;color:var(--ink3);font-weight:400;display:block;margin-top:1px}
+.mrow .dot-c{width:12px;height:12px;border-radius:50%;background:var(--cc);flex:none}
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;padding:4px 18px 10px}
+.emoji-grid button{height:38px;border-radius:9px;font-size:1.2rem}
+.emoji-grid button.on{background:color-mix(in srgb,var(--accent) 18%,transparent);box-shadow:inset 0 0 0 2px var(--accent)}
+.color-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;padding:4px 18px 12px}
+.color-grid button{aspect-ratio:1;border-radius:50%}
+.color-grid button.on{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--ink2)}
+.field-label{padding:10px 20px 2px;font-size:.76rem;font-weight:700;color:var(--ink2)}
+
 /* ===== 시트 / 토스트 / 스피너 ===== */
 .sheet-wrap{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.42);display:flex;align-items:flex-end;animation:fade .16s}
 @keyframes fade{from{opacity:0}to{opacity:1}}
@@ -231,7 +308,7 @@ html[data-dark="1"] .sw i{background:#3a4047}
 .btn-ghost{background:var(--line2);color:var(--ink)}
 .btn-main{background:var(--accent);color:var(--accent-ink)}
 .btn-danger{background:var(--danger);color:#fff}
-.sheet input[type="text"],.sheet input[type="datetime-local"],.sheet input[type="time"]{
+.sheet input[type="text"],.sheet input[type="datetime-local"],.sheet input[type="time"],.sheet input[type="date"]{
   width:calc(100% - 40px);margin:4px 20px 8px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--bg);outline:0;
 }
 
@@ -249,6 +326,11 @@ html[data-dark="1"] .sw i{background:#3a4047}
 
 .lightbox{position:fixed;inset:0;z-index:400;background:#000;display:flex;align-items:center;justify-content:center}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain}
+
+/* 동작 줄이기를 켠 기기에서는 화면 전환 애니메이션을 끈다 */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}
 
 /* 데스크톱에서는 폰 크기 프레임으로 */
 @media(min-width:760px){

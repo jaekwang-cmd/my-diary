@@ -81,6 +81,31 @@
     </div>
   </section>
 
+  <!-- 통계 뷰 -->
+  <section class="view hidden" id="view-stat">
+    <header class="topbar">
+      <button class="ic" id="statPrev"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button>
+      <button class="mon-pill" id="statTitle">2026년 7월</button>
+      <button class="ic" id="statNext"><svg viewBox="0 0 24 24"><path d="m8.6 5.4 1.4-1.4 8 8-8 8-1.4-1.4 6.6-6.6z"/></svg></button>
+      <button class="ic" id="statCfg" aria-label="표시 설정">
+        <svg viewBox="0 0 24 24"><path d="M12 5c-5 0-9.3 3.1-11 7 1.7 3.9 6 7 11 7s9.3-3.1 11-7c-1.7-3.9-6-7-11-7zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+      </button>
+    </header>
+    <div class="scroll" id="statScroll">
+      <div id="statSummary"></div>
+      <div id="statCounts"></div>
+      <div id="statHeatmap"></div>
+      <div id="statDday"></div>
+      <div class="sec-label">관리</div>
+      <div class="card">
+        <button class="row" id="rowManageRoutine"><span class="ri">🏷️</span><span class="rt">루틴 카탈로그 편집</span><span class="rv" id="vRoutineCount"></span><span class="rc"></span></button>
+        <button class="row" id="rowManageDday"><span class="ri">📆</span><span class="rt">D-DAY 편집</span><span class="rv" id="vDdayCount"></span><span class="rc"></span></button>
+        <button class="row" id="rowStatCfg"><span class="ri">👁️</span><span class="rt">통계 표시 항목</span><span class="rc"></span></button>
+      </div>
+      <div style="height:20px"></div>
+    </div>
+  </section>
+
   <!-- 설정 뷰 -->
   <section class="view hidden" id="view-set">
     <header class="topbar"><h1>설정</h1></header>
@@ -153,7 +178,7 @@
         <div class="row static"><span class="ri">📊</span><span class="rt">저장된 일기</span><span class="rv" id="vCount">0건</span></div>
         <div class="row static"><span class="ri">🖼️</span><span class="rt">사진 사용량</span><span class="rv" id="vStorage">-</span></div>
       </div>
-      <p class="ver">심플 일기장 · PWA version 1.0.0</p>
+      <p class="ver">심플 일기장 · PWA version 1.1.0</p>
     </div>
   </section>
 
@@ -166,6 +191,10 @@
     <button class="tab" data-tab="cal">
       <svg viewBox="0 0 24 24"><path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zM5 9h14v10H5V9zm2 2v2h2v-2H7zm4 0v2h2v-2h-2zm4 0v2h2v-2h-2z"/></svg>
       <span>달력</span>
+    </button>
+    <button class="tab" data-tab="stat">
+      <svg viewBox="0 0 24 24"><path d="M4 20h3v-7H4v7zm6.5 0h3V4h-3v16zm6.5 0h3v-11h-3v11z"/></svg>
+      <span>통계</span>
     </button>
     <button class="tab" data-tab="set">
       <svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/><path d="m19.4 13-.1-1 .1-1 2-1.5-2-3.4-2.4 1a7.7 7.7 0 0 0-1.7-1L15 3H9.9l-.4 2.6c-.6.3-1.2.6-1.7 1l-2.4-1-2 3.5 2 1.5v2l-2 1.5 2 3.4 2.4-1c.5.4 1.1.8 1.7 1l.4 2.5h5.1l.4-2.6c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.4-2-1.5z" opacity=".55"/></svg>
@@ -188,6 +217,7 @@
   </header>
   <div class="scroll edit-scroll">
     <input id="edTitle" class="ed-title" placeholder="제목" maxlength="120">
+    <div class="chiprow" id="edRoutines"></div>
     <textarea id="edBody" class="ed-body" placeholder="오늘은 어떤 하루였나요?"></textarea>
     <div class="photo-strip" id="edPhotos"></div>
   </div>

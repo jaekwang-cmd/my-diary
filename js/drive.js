@@ -187,14 +187,27 @@ function mergeEntries(local, remote, tombstones) {
 
 async function readRemoteBundle(files) {
   const f = files.get(ENTRIES_FILE);
-  if (!f) return { entries: [], tombstones: [] };
+  if (!f) return { entries: [], tombstones: [], catalog: null };
   try {
     const txt = await (await download(f.id)).text();
     const j = JSON.parse(txt);
-    return { entries: j.entries || [], tombstones: j.tombstones || [] };
+    return { entries: j.entries || [], tombstones: j.tombstones || [], catalog: j.catalog || null };
   } catch {
-    return { entries: [], tombstones: [] };
+    return { entries: [], tombstones: [], catalog: null };
   }
+}
+
+/** 루틴·D-DAY 카탈로그는 통째로 최신 수정본이 이긴다 */
+function mergeCatalog(remoteCatalog) {
+  const local = S.getCatalog();
+  if (remoteCatalog && (remoteCatalog.catalogAt || 0) > (local.catalogAt || 0)) {
+    S.saveCatalog(
+      { routines: remoteCatalog.routines || [], ddays: remoteCatalog.ddays || [] },
+      remoteCatalog.catalogAt
+    );
+    return { catalog: S.getCatalog(), changed: true };
+  }
+  return { catalog: local, changed: false };
 }
 
 /**
@@ -218,6 +231,7 @@ export async function sync(mode = 'sync', onProgress = () => {}) {
 
   const tombstones = dedupeTomb([...localTomb, ...remote.tombstones]);
   const merged = mergeEntries(localEntries, remote.entries, tombstones);
+  const cat = mergeCatalog(remote.catalog);
 
   // 1) 원격 → 로컬 반영
   const localMap = new Map(localEntries.map(e => [e.id, e]));
@@ -264,7 +278,7 @@ export async function sync(mode = 'sync', onProgress = () => {}) {
     onProgress('일기 데이터 올리는 중…');
     const bundle = new Blob([JSON.stringify({
       version: 1, app: 'simple-diary', savedAt: new Date().toISOString(),
-      entries: merged, tombstones,
+      entries: merged, tombstones, catalog: cat.catalog,
     })], { type: 'application/json' });
     const ex = files.get(ENTRIES_FILE);
     if (ex) await updateContent(ex.id, bundle, 'application/json');
@@ -283,7 +297,7 @@ export async function sync(mode = 'sync', onProgress = () => {}) {
 
   const now = Date.now();
   await DB.setMeta('lastSync', now);
-  return { added, updated, removed, pulled, pushed, total: merged.length, at: now };
+  return { added, updated, removed, pulled, pushed, catalog: cat.changed, total: merged.length, at: now };
 }
 
 function dedupeTomb(list) {

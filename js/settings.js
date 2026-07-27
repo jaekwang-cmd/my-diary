@@ -21,6 +21,21 @@ export const THEMES = [
   { id: 'midnight',  name: '미드나잇',  c: '#455A64' },
 ];
 
+// 처음 실행할 때 들어가는 기본 루틴
+export const SEED_ROUTINES = [
+  { id: 'r_gym',    name: '헬스',   emoji: '💪', color: '#EC5F8E', tag: '헬스' },
+  { id: 'r_date',   name: '데이트', emoji: '❤️', color: '#F06292', tag: '데이트' },
+  { id: 'r_study',  name: '공부',   emoji: '✏️', color: '#5C6BC0', tag: '공부' },
+  { id: 'r_book',   name: '독서',   emoji: '📚', color: '#3E9E70', tag: '독서' },
+  { id: 'r_walk',   name: '산책',   emoji: '🚶', color: '#3BA9F0', tag: '산책' },
+  { id: 'r_drink',  name: '술',     emoji: '🍺', color: '#EFA00B', tag: '술' },
+];
+
+export const ROUTINE_EMOJIS = [
+  '💪', '❤️', '✏️', '📚', '🚶', '🍺', '🏃', '🧘', '🎬', '🎮', '☕', '🍚',
+  '🎸', '✈️', '🛒', '🧹', '💊', '😴', '🐶', '🎧', '💻', '🚭', '💰', '⛪',
+];
+
 const DEFAULTS = {
   theme: 'blue',
   appearance: 'system',   // system | light | dark
@@ -37,6 +52,13 @@ const DEFAULTS = {
   autoSync: false,
   clientId: '',
   driveEmail: '',
+
+  // ── 루틴 / D-DAY / 통계 ──
+  routines: SEED_ROUTINES,          // [{id,name,emoji,color,tag}]
+  ddays: [],                        // [{id,name,emoji,color,start,end}]
+  catalogAt: 0,                     // 루틴·D-DAY 마지막 수정 시각 (기기 간 병합용)
+  statsSections: { summary: true, counts: true, heatmap: true, dday: true },
+  hiddenRoutines: [],               // 통계에서 뺄 루틴 id
 };
 
 const KEY = 'diary.settings';
@@ -75,6 +97,36 @@ export function applyTheme() {
 
 window.matchMedia('(prefers-color-scheme: dark)')
   .addEventListener('change', () => { if (S.appearance === 'system') applyTheme(); });
+
+/* ---------- 루틴 / D-DAY 카탈로그 ---------- */
+export function getCatalog() {
+  return { routines: S.routines || [], ddays: S.ddays || [], catalogAt: S.catalogAt || 0 };
+}
+/** 카탈로그를 바꾸면 수정 시각을 올려 다른 기기와 병합할 수 있게 한다 */
+export function saveCatalog({ routines, ddays }, stamp) {
+  const o = {};
+  if (routines) o.routines = routines;
+  if (ddays) o.ddays = ddays;
+  o.catalogAt = stamp || Date.now();
+  setMany(o);
+}
+export function routineById(id) {
+  return (S.routines || []).find(r => r.id === id) || null;
+}
+export function newId(prefix) {
+  return prefix + '_' + Math.random().toString(36).slice(2, 9);
+}
+
+/** 일기에 실제로 걸린 루틴 id 목록 = 직접 고른 칩 + 본문 해시태그로 걸린 것 */
+export function effectiveRoutines(entry) {
+  const out = new Set(entry.routines || []);
+  const tags = (entry.tags || []).map(t => t.toLowerCase());
+  for (const r of (S.routines || [])) {
+    const key = (r.tag || r.name || '').toLowerCase();
+    if (key && tags.includes(key)) out.add(r.id);
+  }
+  return [...out];
+}
 
 /* ---------- 패스코드 해시 ---------- */
 export async function hashPin(pin, salt) {
